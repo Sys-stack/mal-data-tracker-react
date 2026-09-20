@@ -39,6 +39,13 @@ CREATE INDEX IF NOT EXISTS idx_growth_anime_time ON growth_snapshots (anime_id, 
 ALTER TABLE growth_snapshots ADD COLUMN IF NOT EXISTS rank INTEGER;
 ALTER TABLE growth_snapshots ADD COLUMN IF NOT EXISTS popularity INTEGER;
 
+-- Earlier deployments stored catalog rows in a Postgres `anime` table and
+-- constrained snapshots to it.  The catalog now lives in the mirrored local
+-- SQLite state (`anime_catalog`), so that legacy constraint rejects valid
+-- snapshots from newly tracked shows.  Keep this migration idempotent for
+-- both fresh databases and existing deployments.
+ALTER TABLE growth_snapshots DROP CONSTRAINT IF EXISTS growth_snapshots_anime_id_fkey;
+
 -- A complete, JSONB mirror of fal_local.db.  Keeping this as one atomic
 -- document prevents an interrupted deployment from leaving a partial team.
 CREATE TABLE IF NOT EXISTS local_state_backups (
