@@ -1,0 +1,14 @@
+.env
+fal_local.db
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+growth data/
+*.csv
+.DS_Store
+frontend/node_modules/
+# static_dist/ is the built React app -- intentionally NOT ignored so the
+# app runs out of the box without requiring Node.js. Rebuild it any time
+# frontend/src changes with: cd frontend && npm run build

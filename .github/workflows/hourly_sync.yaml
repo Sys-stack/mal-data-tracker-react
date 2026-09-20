@@ -1,0 +1,42 @@
+name: Hourly FAL Data Sync
+
+on:
+  schedule:
+    # Runs at minute 0 of every hour. GitHub's scheduler is best-effort and
+    # can lag a few minutes during high load -- that's normal.
+    - cron: "0 * * * *"
+  workflow_dispatch: {}   # lets you trigger a sync manually from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run hourly sync
+        env:
+          # Values may be GitHub Secrets (recommended for credentials) or
+          # repository Variables. Local development reads the same names from .env.
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID || vars.MAL_CLIENT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          DB_HOST: ${{ secrets.DB_HOST || vars.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || vars.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || vars.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME || vars.DB_NAME }}
+          DB_SSLMODE: require
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY || vars.SUPABASE_KEY }}
+          TRACK_SEASON: ${{ vars.TRACK_SEASON }}
+          TRACK_YEAR: ${{ vars.TRACK_YEAR }}
+          TRACK_IDS: ${{ vars.TRACK_IDS }}
+        run: python scripts/run_sync.py
