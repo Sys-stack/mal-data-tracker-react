@@ -2,10 +2,8 @@ name: Hourly FAL Data Sync
 
 on:
   schedule:
-    # Runs at minute 0 of every hour. GitHub's scheduler is best-effort and
-    # can lag a few minutes during high load -- that's normal.
-    - cron: "35 * * * *"
-  workflow_dispatch: {}   # lets you trigger a sync manually from the Actions tab
+    - cron: "11 * * * *"
+  workflow_dispatch: {}
 
 jobs:
   sync:
