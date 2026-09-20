@@ -4,7 +4,7 @@ on:
   schedule:
     # Runs at minute 0 of every hour. GitHub's scheduler is best-effort and
     # can lag a few minutes during high load -- that's normal.
-    - cron: "0 * * * *"
+    - cron: "35 * * * *"
   workflow_dispatch: {}   # lets you trigger a sync manually from the Actions tab
 
 jobs:
