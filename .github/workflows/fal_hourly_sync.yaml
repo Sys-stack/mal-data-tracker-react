@@ -2,7 +2,7 @@ name: Hourly FAL Data Sync
 
 on:
   schedule:
-    - cron: "11 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch: {}
 
 jobs:
