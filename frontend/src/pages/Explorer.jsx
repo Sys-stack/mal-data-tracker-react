@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Search, X, ArrowUpDown, RefreshCw, AlertCircle } from "lucide-react";
 import { api } from "../lib/api.js";
@@ -139,6 +139,7 @@ export default function Explorer() {
     () => getBucketLabels(selected, growthById, metric),
     [selected, growthById, metric]
   );
+  const hasBuckets = bucketLabels.length > 0;
 
   const effectiveBrush = useMemo(() => {
     const len = bucketLabels.length;
@@ -147,6 +148,22 @@ export default function Explorer() {
     const end = brushRange ? Math.min(brushRange.endIndex, len - 1) : len - 1;
     return { startIndex: Math.min(start, end), endIndex: Math.max(start, end) };
   }, [brushRange, bucketLabels.length]);
+
+  // What we actually feed the Brush as its startIndex/endIndex props. This
+  // deliberately only recomputes on an explicit reset or when data first
+  // becomes available -- NOT on every drag tick. Recharts' Brush fights
+  // back (jumps/stutters) if you keep re-feeding it a "live" index while
+  // the user is mid-drag; it needs to own its position during a drag and
+  // only be repositioned by us when we deliberately want to move it.
+  const brushSeed = useMemo(() => {
+    const len = bucketLabels.length;
+    if (!len) return { startIndex: 0, endIndex: 0 };
+    const start = brushRange ? Math.min(brushRange.startIndex, len - 1) : 0;
+    const end = brushRange ? Math.min(brushRange.endIndex, len - 1) : len - 1;
+    return { startIndex: Math.min(start, end), endIndex: Math.max(start, end) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetToken, hasBuckets]);
+  const brushKey = `${resetToken}-${hasBuckets}`;
 
   const periodStartLabel = bucketLabels[effectiveBrush.startIndex];
   const periodEndLabel = bucketLabels[effectiveBrush.endIndex];
@@ -159,6 +176,17 @@ export default function Explorer() {
   function resetZoom() {
     setBrushRange(null);
     setResetToken((t) => t + 1);
+  }
+
+  // Recharts calls onChange on every intermediate step of a drag, not just
+  // on release. Committing straight to state each time reruns the whole
+  // chart-data/period-table recompute per pixel, which is what made
+  // dragging feel laggy -- so we debounce the commit a touch instead.
+  const brushChangeTimer = useRef(null);
+  useEffect(() => () => clearTimeout(brushChangeTimer.current), []);
+  function handleBrushChange(range) {
+    clearTimeout(brushChangeTimer.current);
+    brushChangeTimer.current = setTimeout(() => setBrushRange(range), 60);
   }
 
   // --- Chart data (Absolute / % change / Net gain) -----------------------
@@ -386,11 +414,11 @@ export default function Explorer() {
                       series={chartSeries}
                       mode={chartMode}
                       valueFormatter={fmt}
-                      brushStartIndex={effectiveBrush.startIndex}
-                      brushEndIndex={effectiveBrush.endIndex}
-                      onBrushChange={(range) => setBrushRange(range)}
+                      brushKey={brushKey}
+                      brushStartIndex={brushSeed.startIndex}
+                      brushEndIndex={brushSeed.endIndex}
+                      onBrushChange={handleBrushChange}
                       onPointClick={(label) => setManualBaseline(label)}
-                      resetToken={resetToken}
                     />
                   </div>
                 )}

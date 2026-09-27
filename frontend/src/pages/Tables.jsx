@@ -5,7 +5,7 @@ import { api } from "../lib/api.js";
 import {
   METRICS, METRIC_LABELS, SUMMARY_METRICS,
   withDerived, fmt, formatTimestamp, formatDate, defaultDirFor,
-  rowsInDateRange, addDays, periodGain,
+  rowsInDateRange, addDays, periodGain, sumPeriodGain,
 } from "../lib/metrics.js";
 import { PageShell, Thumb, EmptyState } from "../components/Common.jsx";
 
@@ -14,6 +14,10 @@ const TABS = [
   { id: "preseason", label: "Preseason" },
   { id: "history", label: "Raw history" },
 ];
+
+// Tables is a dense analysis view, not a chart legend -- no real reason to
+// cap this as tightly as Explorer's chart does.
+const MAX_SELECTED = 40;
 
 let nextStatId = 1;
 function defaultPreseasonStat() {
@@ -32,7 +36,7 @@ export default function Tables() {
   const [seasonWeeks, setSeasonWeeks] = useState(13); // overwritten once /config loads
   const [configError, setConfigError] = useState("");
   const [seasonStart, setSeasonStart] = useState("");
-  const [weekRules, setWeekRules] = useState(() => Array(13).fill(null));
+  const [weekRules, setWeekRules] = useState(() => Array.from({ length: 13 }, () => []));
   const [bulkOdd, setBulkOdd] = useState("");
   const [bulkEven, setBulkEven] = useState("");
   const [pointsSortDir, setPointsSortDir] = useState("desc");
@@ -51,12 +55,9 @@ export default function Tables() {
           setSeasonWeeks(cfg.season_weeks);
           // Week 1 is Watching per the league rules given so far; every other
           // week is left unset until you tell me what the rest are.
-          setWeekRules((cur) => {
-            const next = Array(cfg.season_weeks).fill(null);
-            next[0] = cur[0] ?? "watching";
-            for (let i = 1; i < next.length; i++) next[i] = cur[i] ?? null;
-            return next;
-          });
+          setWeekRules((cur) =>
+            Array.from({ length: cfg.season_weeks }, (_, i) => cur[i] ?? (i === 0 ? ["watching"] : []))
+          );
         }
       })
       .catch((error) => setConfigError(error.message));
@@ -99,7 +100,7 @@ export default function Tables() {
       setSelectedIds((cur) => cur.filter((x) => x !== id));
       return;
     }
-    if (selectedIds.length >= 10) return;
+    if (selectedIds.length >= MAX_SELECTED) return;
     setSelectedIds((cur) => [...cur, id]);
     if (!growthById[id]) fetchGrowth(id);
   }
@@ -110,10 +111,19 @@ export default function Tables() {
 
   // --- Weekly points -------------------------------------------------
 
-  function setWeekRule(weekIdx, value) {
+  function addMetricToWeek(weekIdx, metric) {
     setWeekRules((cur) => {
       const next = [...cur];
-      next[weekIdx] = value || null;
+      const existing = next[weekIdx] || [];
+      if (!existing.includes(metric)) next[weekIdx] = [...existing, metric];
+      return next;
+    });
+  }
+
+  function removeMetricFromWeek(weekIdx, metric) {
+    setWeekRules((cur) => {
+      const next = [...cur];
+      next[weekIdx] = (next[weekIdx] || []).filter((m) => m !== metric);
       return next;
     });
   }
@@ -124,7 +134,7 @@ export default function Tables() {
       cur.map((v, i) => {
         const weekNum = i + 1;
         const isOdd = weekNum % 2 === 1;
-        return (parity === "odd") === isOdd ? metricValue : v;
+        return (parity === "odd") === isOdd ? [metricValue] : v;
       })
     );
   }
@@ -142,10 +152,10 @@ export default function Tables() {
     return selected.map((anime) => {
       const rows = (growthById[anime.id] || []).map(withDerived);
       const weekly = weekRanges.map((w, i) => {
-        const metricKey = weekRules[i];
-        if (!metricKey) return { week: w.week, metric: null, gain: null };
+        const metrics = weekRules[i] || [];
+        if (metrics.length === 0) return { week: w.week, metrics: [], gain: null };
         const windowed = rowsInDateRange(rows, `${w.start}T00:00:00`, `${w.end}T00:00:00`);
-        return { week: w.week, metric: metricKey, gain: periodGain(windowed, metricKey) };
+        return { week: w.week, metrics, gain: sumPeriodGain(windowed, metrics) };
       });
       const total = weekly.reduce((sum, w) => sum + (w.gain ?? 0), 0);
       return { anime, weekly, total };
@@ -249,7 +259,7 @@ export default function Tables() {
           </div>
           {selected.length > 0 && (
             <div className="flex items-center justify-between mb-2 px-0.5">
-              <span className="text-[10.5px] text-ink-faint font-mono">{selected.length}/10 selected</span>
+              <span className="text-[10.5px] text-ink-faint font-mono">{selected.length}/{MAX_SELECTED} selected</span>
               <button onClick={clearAll} className="text-[10.5px] text-rust hover:underline">clear</button>
             </div>
           )}
@@ -263,7 +273,7 @@ export default function Tables() {
                 <button
                   key={c.id}
                   onClick={() => toggle(c.id)}
-                  disabled={!isOn && selectedIds.length >= 10}
+                  disabled={!isOn && selectedIds.length >= MAX_SELECTED}
                   className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors disabled:opacity-40 ${
                     isOn ? "bg-pine-soft" : "hover:bg-panel-alt"
                   }`}
@@ -374,16 +384,24 @@ export default function Tables() {
                       <tr className="text-left text-xs text-ink-faint border-b border-line">
                         <th className="py-1.5 pr-4 sticky left-0 bg-white">Show</th>
                         {weekRanges.map((w, i) => (
-                          <th key={w.week} className="pr-4 align-bottom pt-1">
+                          <th key={w.week} className="pr-4 align-bottom pt-1 min-w-[130px]">
                             <div className="flex flex-col items-start gap-1">
                               <span>Wk {w.week}</span>
+                              <div className="flex flex-wrap gap-1 max-w-[130px]">
+                                {(weekRules[i] || []).map((m) => (
+                                  <span key={m} className="chip bg-pine-soft text-pine-dark text-[9px] py-0 px-1.5 flex items-center gap-1">
+                                    {METRIC_LABELS[m]}
+                                    <button onClick={() => removeMetricFromWeek(i, m)} className="hover:text-rust leading-none">×</button>
+                                  </span>
+                                ))}
+                              </div>
                               <select
-                                value={weekRules[i] ?? ""}
-                                onChange={(e) => setWeekRule(i, e.target.value)}
-                                className="field text-[10px] py-0.5 px-1 w-[90px]"
+                                value=""
+                                onChange={(e) => { if (e.target.value) addMetricToWeek(i, e.target.value); }}
+                                className="field text-[10px] py-0.5 px-1 w-[110px]"
                               >
-                                <option value="">— unset —</option>
-                                {METRICS.map((m) => (
+                                <option value="">+ add metric</option>
+                                {METRICS.filter((m) => !(weekRules[i] || []).includes(m)).map((m) => (
                                   <option key={m} value={m}>{METRIC_LABELS[m]}</option>
                                 ))}
                               </select>
@@ -411,8 +429,12 @@ export default function Tables() {
                             </Link>
                           </td>
                           {weekly.map((w) => (
-                            <td key={w.week} className="pr-4 font-mono text-center">
-                              {w.metric == null ? (
+                            <td
+                              key={w.week}
+                              className="pr-4 font-mono text-center"
+                              title={w.metrics.length ? w.metrics.map((m) => METRIC_LABELS[m]).join(" + ") : undefined}
+                            >
+                              {w.metrics.length === 0 ? (
                                 <span className="text-ink-faint">—</span>
                               ) : w.gain == null ? (
                                 <span className="text-ink-faint">no data</span>

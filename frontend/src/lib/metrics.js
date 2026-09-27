@@ -106,3 +106,13 @@ export function periodGain(rows, metric) {
   if (withValue.length < 2) return null;
   return withValue[withValue.length - 1][metric] - withValue[0][metric];
 }
+
+// A week's points can come from more than one metric (e.g. "score + watching_completed").
+// Sums whatever metrics have data; returns null only when NONE of them do,
+// so "no data at all" reads differently from "this metric didn't move".
+export function sumPeriodGain(rows, metricKeys) {
+  if (!metricKeys || metricKeys.length === 0) return null;
+  const gains = metricKeys.map((m) => periodGain(rows, m));
+  if (gains.every((g) => g == null)) return null;
+  return gains.reduce((sum, g) => sum + (g ?? 0), 0);
+}

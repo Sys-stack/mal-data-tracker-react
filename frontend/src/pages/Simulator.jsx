@@ -69,6 +69,29 @@ export default function Simulator() {
   const bestWeek = useMemo(() => sim?.weeks.reduce((b, w) => (w.team_total > (b?.team_total ?? -Infinity) ? w : b), null), [sim]);
   const worstWeek = useMemo(() => sim?.weeks.reduce((b, w) => (w.team_total < (b?.team_total ?? Infinity) ? w : b), null), [sim]);
 
+  // Same idea as the Tables page's Weekly points view (Show x Week grid),
+  // but built from this team's actual simulated scoring rather than a raw
+  // metric-gain guess -- this already runs through Ace/wildcard modifiers.
+  const weeklyGrid = useMemo(() => {
+    if (!sim) return { rows: [], weekNums: [] };
+    const weekNums = sim.weeks.map((w) => w.week);
+    const byAnime = {};
+    for (const w of sim.weeks) {
+      for (const [aid, info] of Object.entries(w.per_anime)) {
+        if (!byAnime[aid]) byAnime[aid] = { anime_id: aid, title: info.title, totals: {} };
+        byAnime[aid].totals[w.week] = info.total;
+      }
+    }
+    const rows = Object.values(byAnime)
+      .map((r) => {
+        const weekly = weekNums.map((wn) => (wn in r.totals ? r.totals[wn] : null));
+        const total = weekly.reduce((sum, v) => sum + (v ?? 0), 0);
+        return { anime_id: r.anime_id, title: r.title, weekly, total };
+      })
+      .sort((a, b) => b.total - a.total);
+    return { rows, weekNums };
+  }, [sim]);
+
   if (!team) return <PageShell title="Simulator"><div className="text-sm text-ink-faint">Loading…</div></PageShell>;
 
   return (
@@ -139,6 +162,41 @@ export default function Simulator() {
                       ? s.aceWeeks.map((a) => <Chip key={a.week} tone={a.outcome === "succeeded" ? "pine" : "rust"}>wk{a.week} {a.outcome === "succeeded" ? "✓" : "✕"}</Chip>)
                       : <span className="text-ink-faint">—</span>}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Weekly points grid */}
+          <div className="panel p-5 mb-6 overflow-x-auto">
+            <h4 className="text-sm mb-3">Weekly points grid</h4>
+            <table className="text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-faint border-b border-line">
+                  <th className="py-1.5 pr-4 sticky left-0 bg-white">Show</th>
+                  {weeklyGrid.weekNums.map((wn) => (
+                    <th key={wn} className="pr-4 text-center">Wk {wn}</th>
+                  ))}
+                  <th className="pr-4">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weeklyGrid.rows.map((r) => (
+                  <tr key={r.anime_id} className="border-b border-line last:border-0">
+                    <td className="py-1.5 pr-4 sticky left-0 bg-white">
+                      <Link to={`/anime/${r.anime_id}`} className="hover:text-pine font-medium">{r.title}</Link>
+                    </td>
+                    {r.weekly.map((v, i) => (
+                      <td key={i} className="pr-4 font-mono text-center">
+                        {v == null ? (
+                          <span className="text-ink-faint">—</span>
+                        ) : (
+                          <span className={v < 0 ? "text-rust" : ""}>{Math.round(v).toLocaleString()}</span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="pr-4 font-mono font-semibold">{Math.round(r.total).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

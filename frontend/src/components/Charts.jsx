@@ -66,11 +66,13 @@ export function CompareChart({ series }) {
 // - onBrushChange: ({ startIndex, endIndex }) => void
 // - onPointClick: (label) => void -- fires with the clicked bucket's label,
 //   used by Explorer to let the user zero a metric at a point they pick
-// - resetToken: bump this to force the Brush to snap back to the controlled
-//   indices (recharts' Brush otherwise ignores prop updates after mount)
+// - brushKey: pass a value that only changes when you want the Brush to
+//   forcibly snap to brushStartIndex/brushEndIndex (e.g. an explicit
+//   "reset zoom"). Recharts' Brush otherwise owns its position once
+//   mounted and fights back if re-fed a "live" index on every drag tick.
 export function ExplorerGrowthChart({
   data, series, mode = "absolute", valueFormatter = (v) => v,
-  brushStartIndex, brushEndIndex, onBrushChange, onPointClick, resetToken = 0,
+  brushStartIndex, brushEndIndex, onBrushChange, onPointClick, brushKey = "default",
 }) {
   const yTick = (v) => {
     if (mode === "percent") return `${v > 0 ? "+" : ""}${v}%`;
@@ -110,7 +112,7 @@ export function ExplorerGrowthChart({
           />
         ))}
         <Brush
-          key={`${resetToken}-${data.length}`}
+          key={brushKey}
           dataKey="label"
           height={26}
           stroke="#3A6B5C"
