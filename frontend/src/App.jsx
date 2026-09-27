@@ -2,11 +2,13 @@ import { Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Browse from "./pages/Browse.jsx";
+import Explorer from "./pages/Explorer.jsx";
 import Predictor from "./pages/Predictor.jsx";
 import Teams from "./pages/Teams.jsx";
 import Planner from "./pages/Planner.jsx";
 import Simulator from "./pages/Simulator.jsx";
 import AnimeDetail from "./pages/AnimeDetail.jsx";
+import Tables from "./pages/Tables.jsx";
 
 export default function App() {
   return (
@@ -17,10 +19,12 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/anime/:id" element={<AnimeDetail />} />
           <Route path="/browse" element={<Browse />} />
+          <Route path="/explorer" element={<Explorer />} />
           <Route path="/predictor" element={<Predictor />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/planner/:teamId" element={<Planner />} />
           <Route path="/planner/:teamId/simulate" element={<Simulator />} />
+          <Route path="/tables" element={<Tables />} />
         </Routes>
       </main>
     </div>

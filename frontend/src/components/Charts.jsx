@@ -1,5 +1,5 @@
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, Brush,
 } from "recharts";
 
 const AXIS_STYLE = { fontSize: 11, fill: "#8B9088", fontFamily: "'IBM Plex Mono', monospace" };
@@ -50,6 +50,76 @@ export function CompareChart({ series }) {
           <Line key={s.title} type="monotone" dataKey={s.title} stroke={PALETTE[i % PALETTE.length]}
                 strokeWidth={2} dot={false} isAnimationActive={false} />
         ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+// Explorer: hourly growth comparison across several shows at once, with a
+// draggable Brush for zoom/pan and three read modes (see Explorer.jsx for
+// how `data` gets baselined for "percent"/"net").
+// - data: [{ label, [animeTitle]: value }, ...] sorted by label ascending
+// - series: [{ key: animeTitle, color }]
+// - mode: "absolute" | "percent" | "net"
+// - valueFormatter: (v) => string, used for absolute values and net deltas
+// - brushStartIndex/brushEndIndex: controlled Brush window into `data`
+// - onBrushChange: ({ startIndex, endIndex }) => void
+// - onPointClick: (label) => void -- fires with the clicked bucket's label,
+//   used by Explorer to let the user zero a metric at a point they pick
+// - resetToken: bump this to force the Brush to snap back to the controlled
+//   indices (recharts' Brush otherwise ignores prop updates after mount)
+export function ExplorerGrowthChart({
+  data, series, mode = "absolute", valueFormatter = (v) => v,
+  brushStartIndex, brushEndIndex, onBrushChange, onPointClick, resetToken = 0,
+}) {
+  const yTick = (v) => {
+    if (mode === "percent") return `${v > 0 ? "+" : ""}${v}%`;
+    if (mode === "net") return `${v > 0 ? "+" : ""}${valueFormatter(v)}`;
+    return valueFormatter(v);
+  };
+  const tooltipFmt = (v) => {
+    if (mode === "percent") return `${v > 0 ? "+" : ""}${Math.round(v * 10) / 10}%`;
+    if (mode === "net") return `${v > 0 ? "+" : ""}${valueFormatter(v)}`;
+    return valueFormatter(v);
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart
+        data={data}
+        margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
+        onClick={(e) => e?.activeLabel && onPointClick?.(e.activeLabel)}
+        style={onPointClick ? { cursor: "pointer" } : undefined}
+      >
+        <CartesianGrid strokeDasharray="3 3" {...GRID_STYLE} vertical={false} />
+        <XAxis dataKey="label" tick={AXIS_STYLE} axisLine={{ stroke: "#DEE2D9" }} tickLine={false} minTickGap={40} />
+        <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={64} tickFormatter={yTick} />
+        {mode !== "absolute" && <ReferenceLine y={0} stroke="#DEE2D9" />}
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipFmt} />
+        <Legend wrapperStyle={{ fontSize: 11, fontFamily: "'IBM Plex Sans', sans-serif" }} />
+        {series.map((s) => (
+          <Line
+            key={s.key}
+            type="monotone"
+            dataKey={s.key}
+            stroke={s.color}
+            strokeWidth={2}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        ))}
+        <Brush
+          key={`${resetToken}-${data.length}`}
+          dataKey="label"
+          height={26}
+          stroke="#3A6B5C"
+          travellerWidth={8}
+          startIndex={brushStartIndex}
+          endIndex={brushEndIndex}
+          onChange={onBrushChange}
+          tickFormatter={(i) => (data[i]?.label || "").replace("T", " ") + "h"}
+        />
       </LineChart>
     </ResponsiveContainer>
   );

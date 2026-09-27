@@ -1,11 +1,13 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Compass, LineChart, Users, RefreshCw } from "lucide-react";
+import { LayoutGrid, Compass, Search, LineChart, Users, RefreshCw, Table } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api.js";
 
 const LINKS = [
   { to: "/", label: "Dashboard", icon: LayoutGrid, end: true },
   { to: "/browse", label: "Browse", icon: Compass },
+  { to: "/explorer", label: "Explorer", icon: Search },
+  { to: "/tables", label: "Tables", icon: Table },
   { to: "/predictor", label: "Predictor", icon: LineChart },
   { to: "/teams", label: "Team Draft", icon: Users },
 ];
